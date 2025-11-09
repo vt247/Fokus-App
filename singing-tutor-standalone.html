@@ -109,6 +109,32 @@ h2 {
     transform: translateY(-1px);
 }
 
+.btn-reference {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 1rem;
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+}
+
+.btn-reference:hover {
+    background: linear-gradient(135deg, #138496 0%, #117a8b 100%);
+}
+
+.reference-note-section {
+    margin-top: 20px;
+    padding: 15px;
+    background: white;
+    border-radius: 8px;
+}
+
+.reference-note-section .hint {
+    margin-top: 8px;
+    margin-bottom: 0;
+    text-align: center;
+    font-size: 0.85rem;
+    color: #666;
+}
+
 .btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
@@ -342,6 +368,11 @@ h2 {
                     <label for="droneVolume">Äänenvoimakkuus: <span id="volumeValue">-12 dB</span></label>
                     <input type="range" id="droneVolume" min="-40" max="0" value="-12" class="slider">
                 </div>
+
+                <div class="reference-note-section">
+                    <button id="playTarget" class="btn btn-small btn-reference">🔔 Soita referenssinuotti</button>
+                    <p class="hint">Kuuntele miltä nuotti kuulostaa</p>
+                </div>
             </div>
 
             <div class="control-group">
@@ -452,16 +483,32 @@ function initializeDrone() {
         }
     }).connect(reverb);
 
-    // Reference note synth (simple sine wave)
+    // Reference note synth - rich bell-like tone
     referenceNote = new Tone.Synth({
         oscillator: {
-            type: 'sine'
+            type: 'fatsawtooth',
+            count: 3,
+            spread: 40
         },
         envelope: {
+            attack: 0.05,
+            decay: 0.3,
+            sustain: 0.4,
+            release: 2
+        },
+        filter: {
+            type: 'lowpass',
+            frequency: 3000,
+            rolloff: -12,
+            Q: 5
+        },
+        filterEnvelope: {
             attack: 0.1,
-            decay: 0.2,
-            sustain: 0.5,
-            release: 1
+            decay: 0.4,
+            sustain: 0.3,
+            release: 1.5,
+            baseFrequency: 300,
+            octaves: 2.5
         }
     }).toDestination();
 }
@@ -505,7 +552,8 @@ function updateDroneVolume(value) {
 async function playReferenceNote() {
     await Tone.start();
     const rootNote = document.getElementById('rootNote').value;
-    referenceNote.triggerAttackRelease(rootNote, '1n');
+    // Play for 2 seconds - long enough to hear clearly
+    referenceNote.triggerAttackRelease(rootNote, '2n');
 }
 
 // ============ PITCH DETECTION ============
@@ -934,6 +982,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Microphone controls
     document.getElementById('startMic').addEventListener('click', startMicrophone);
     document.getElementById('stopMic').addEventListener('click', stopMicrophone);
+
+    // Reference note
+    document.getElementById('playTarget').addEventListener('click', playReferenceNote);
 });
 
 // Cleanup on page unload
