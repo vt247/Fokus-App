@@ -460,40 +460,36 @@ let droneVolume = null;
 let referenceNote = null;
 let isPlaying = false;
 let isReferencePlaying = false;
-let tanpuraLoop = null;
 
 function initializeDrone() {
     // Create a rich tanpura-like drone sound with reverb
     droneVolume = new Tone.Volume(-12).toDestination();
     const reverb = new Tone.Reverb({
-        decay: 10,
+        decay: 3,
         preDelay: 0.01
     }).connect(droneVolume);
 
-    // Tanpura-style synth with buzzy, metallic character
-    drone = new Tone.PolySynth(Tone.Synth, {
+    // Continuous tanpura-style drone with rich harmonics
+    drone = new Tone.PolySynth(Tone.FMSynth, {
+        harmonicity: 3,
+        modulationIndex: 10,
         oscillator: {
-            type: 'sawtooth4', // Rich harmonics for string-like sound
+            type: 'sine'
         },
         envelope: {
-            attack: 0.002, // Very fast attack for pluck
-            decay: 0.8,
-            sustain: 0.3,
-            release: 8 // Long release for sympathetic resonance
+            attack: 2,
+            decay: 0,
+            sustain: 1, // Full sustain for continuous drone
+            release: 4
         },
-        filter: {
-            type: 'bandpass',
-            frequency: 1200,
-            rolloff: -12,
-            Q: 15 // High Q for metallic/buzzy character (jawari effect)
+        modulation: {
+            type: 'square'
         },
-        filterEnvelope: {
-            attack: 0.02,
-            decay: 0.3,
-            sustain: 0.4,
-            release: 6,
-            baseFrequency: 800,
-            octaves: 2
+        modulationEnvelope: {
+            attack: 0.5,
+            decay: 0,
+            sustain: 1,
+            release: 1
         }
     }).connect(reverb);
 
@@ -515,50 +511,22 @@ async function startDrone() {
     await Tone.start();
     const rootNote = document.getElementById('rootNote').value;
 
-    // Tanpura strings: Sa (root), Pa (fifth), Sa (octave), SA (upper octave)
-    const strings = [
-        rootNote,
-        Tone.Frequency(rootNote).transpose(7).toNote(),  // Fifth (Pa)
-        Tone.Frequency(rootNote).transpose(12).toNote(), // Octave
-        rootNote  // Root again
-    ];
+    // Tanpura-style continuous drone: root, fifth, and octave playing simultaneously
+    const root = rootNote;
+    const fifth = Tone.Frequency(rootNote).transpose(7).toNote();
+    const octave = Tone.Frequency(rootNote).transpose(12).toNote();
 
-    // Traditional tanpura plucking pattern: cyclic strumming
-    // Pattern: string 1, pause, string 2, pause, string 3, pause, string 4, pause
-    let stringIndex = 0;
-
-    if (tanpuraLoop) {
-        tanpuraLoop.stop();
-        tanpuraLoop.dispose();
-    }
-
-    tanpuraLoop = new Tone.Loop((time) => {
-        // Pluck current string
-        drone.triggerAttackRelease(strings[stringIndex], '2n', time);
-
-        // Move to next string
-        stringIndex = (stringIndex + 1) % strings.length;
-    }, '0.5n'); // Pluck every half note (adjustable tempo)
-
-    tanpuraLoop.start(0);
-    Tone.Transport.start();
+    // Trigger all notes to play continuously
+    drone.triggerAttack([root, fifth, octave]);
 
     isPlaying = true;
     updateDroneButtons();
 }
 
 function stopDrone() {
-    if (tanpuraLoop) {
-        tanpuraLoop.stop();
-        tanpuraLoop.dispose();
-        tanpuraLoop = null;
-    }
-
     if (drone) {
         drone.releaseAll();
     }
-
-    Tone.Transport.stop();
 
     isPlaying = false;
     updateDroneButtons();
@@ -763,7 +731,7 @@ function calculateOctaveInvariantCents(frequency, targetNoteName) {
 let pitchHistory = [];
 const maxHistoryLength = 150;
 let smoothedCents = 0;
-const smoothingFactor = 0.15; // Lower = smoother (0-1) - optimized for learning
+const smoothingFactor = 0.25; // Optimized for direct voice control feeling
 
 function updateTunerDisplay(frequency) {
     const canvas = document.getElementById('pitchCanvas');
