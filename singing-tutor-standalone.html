@@ -382,8 +382,8 @@ h2 {
                 </div>
 
                 <div class="reference-note-section">
-                    <button id="playTarget" class="btn btn-small btn-reference">🔔 Soita referenssinuotti</button>
-                    <p class="hint">Kuuntele miltä nuotti kuulostaa</p>
+                    <button id="toggleReference" class="btn btn-small btn-reference">🔔 Soita referenssinuotti</button>
+                    <p class="hint">Puhdas jatkuva ääni johon on helppo laulaa mukaan</p>
                 </div>
             </div>
 
@@ -459,6 +459,7 @@ let drone = null;
 let droneVolume = null;
 let referenceNote = null;
 let isPlaying = false;
+let isReferencePlaying = false;
 
 function initializeDrone() {
     // Create a rich tanpura-like drone sound with reverb
@@ -497,32 +498,16 @@ function initializeDrone() {
         }
     }).connect(reverb);
 
-    // Reference note synth - rich bell-like tone
+    // Reference note synth - pure, clear continuous tone
     referenceNote = new Tone.Synth({
         oscillator: {
-            type: 'fatsawtooth',
-            count: 3,
-            spread: 40
+            type: 'sine' // Pure sine wave for clarity
         },
         envelope: {
-            attack: 0.05,
-            decay: 0.3,
-            sustain: 0.4,
-            release: 2
-        },
-        filter: {
-            type: 'lowpass',
-            frequency: 3000,
-            rolloff: -12,
-            Q: 5
-        },
-        filterEnvelope: {
-            attack: 0.1,
-            decay: 0.4,
-            sustain: 0.3,
-            release: 1.5,
-            baseFrequency: 300,
-            octaves: 2.5
+            attack: 0.3,
+            decay: 0,
+            sustain: 1, // Full sustain for continuous sound
+            release: 1
         }
     }).toDestination();
 }
@@ -563,11 +548,24 @@ function updateDroneVolume(value) {
     document.getElementById('volumeValue').textContent = `${value} dB`;
 }
 
-async function playReferenceNote() {
+async function toggleReferenceNote() {
     await Tone.start();
     const rootNote = document.getElementById('rootNote').value;
-    // Play for 2 seconds - long enough to hear clearly
-    referenceNote.triggerAttackRelease(rootNote, '2n');
+    const btn = document.getElementById('toggleReference');
+
+    if (isReferencePlaying) {
+        // Stop the reference note
+        referenceNote.triggerRelease();
+        isReferencePlaying = false;
+        btn.textContent = '🔔 Soita referenssinuotti';
+        btn.style.background = 'linear-gradient(135deg, #17a2b8 0%, #138496 100%)';
+    } else {
+        // Start the reference note
+        referenceNote.triggerAttack(rootNote);
+        isReferencePlaying = true;
+        btn.textContent = '⏹ Pysäytä referenssi';
+        btn.style.background = 'linear-gradient(135deg, #dc3545 0%, #c82333 100%)';
+    }
 }
 
 // ============ PITCH DETECTION ============
@@ -990,11 +988,18 @@ document.addEventListener('DOMContentLoaded', () => {
         updateDroneVolume(parseFloat(e.target.value));
     });
 
-    // Root note change - restart drone if playing
+    // Root note change - restart drone and reference if playing
     document.getElementById('rootNote').addEventListener('change', () => {
+        const rootNote = document.getElementById('rootNote').value;
+
         if (isPlaying) {
             stopDrone();
             setTimeout(startDrone, 100);
+        }
+
+        if (isReferencePlaying) {
+            // Update reference note to new pitch
+            referenceNote.setNote(rootNote);
         }
     });
 
@@ -1002,8 +1007,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('startMic').addEventListener('click', startMicrophone);
     document.getElementById('stopMic').addEventListener('click', stopMicrophone);
 
-    // Reference note
-    document.getElementById('playTarget').addEventListener('click', playReferenceNote);
+    // Reference note toggle
+    document.getElementById('toggleReference').addEventListener('click', toggleReferenceNote);
 });
 
 // Cleanup on page unload
