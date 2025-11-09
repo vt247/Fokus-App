@@ -193,116 +193,42 @@ h2 {
     border: 3px solid #667eea;
 }
 
-.frequency-display {
+.info-bar {
     display: flex;
     justify-content: space-around;
-    margin-bottom: 30px;
+    margin-bottom: 20px;
     text-align: center;
 }
 
-.detected-note, .frequency {
+.info-item {
     flex: 1;
 }
 
-.detected-note .note {
-    display: block;
-    font-size: 3rem;
-    font-weight: bold;
-    color: #667eea;
-    margin-top: 10px;
-}
-
-.frequency .value {
-    display: block;
-    font-size: 1.8rem;
-    font-weight: 600;
-    color: #764ba2;
-    margin-top: 10px;
-}
-
-.label {
+.info-item .label {
     font-size: 0.9rem;
     color: #666;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 1px;
+    display: block;
+    margin-bottom: 5px;
 }
 
-/* Tuner Meter */
-.tuner-meter {
-    margin-bottom: 20px;
-}
-
-.meter-marks {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 10px;
-    padding: 0 10px;
-}
-
-.meter-marks .mark {
-    font-size: 0.8rem;
-    color: #666;
-    font-weight: 600;
-}
-
-.meter-marks .mark.center {
-    color: #28a745;
+.info-item .value {
+    font-size: 1.5rem;
     font-weight: bold;
-    font-size: 1rem;
+    color: #667eea;
 }
 
-.meter-bar {
-    position: relative;
-    height: 40px;
-    background: linear-gradient(to right,
-        #dc3545 0%,
-        #ffc107 25%,
-        #28a745 45%,
-        #28a745 55%,
-        #ffc107 75%,
-        #dc3545 100%
-    );
-    border-radius: 20px;
-    box-shadow: inset 0 2px 5px rgba(0,0,0,0.2);
-    overflow: hidden;
-}
-
-.meter-center {
-    position: absolute;
-    left: 50%;
-    top: 0;
-    width: 3px;
-    height: 100%;
-    background: white;
-    box-shadow: 0 0 5px rgba(0,0,0,0.5);
-    z-index: 1;
-}
-
-.meter-needle {
-    position: absolute;
-    left: 50%;
-    top: 0;
-    width: 4px;
-    height: 100%;
-    background: #333;
-    box-shadow: 0 0 10px rgba(0,0,0,0.8);
-    transform: translateX(-50%);
-    transition: left 0.1s ease;
-    z-index: 2;
-}
-
-.cents-display {
-    text-align: center;
-    margin-top: 15px;
-}
-
-.cents-display .cents {
-    display: inline-block;
-    font-size: 2rem;
-    font-weight: bold;
-    color: #333;
-    min-width: 80px;
+#pitchCanvas {
+    width: 100%;
+    max-width: 800px;
+    height: 400px;
+    background: #fff;
+    border-radius: 8px;
+    display: block;
+    margin: 0 auto 20px auto;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);
 }
 
 .accuracy-indicator {
@@ -453,34 +379,22 @@ h2 {
         </div>
 
         <div class="tuner-display">
-            <div class="frequency-display">
-                <div class="detected-note">
-                    <span class="label">Tunnistettu nuotti:</span>
-                    <span id="detectedNote" class="note">--</span>
+            <div class="info-bar">
+                <div class="info-item">
+                    <span class="label">Tavoite:</span>
+                    <span id="targetNoteDisplay" class="value">--</span>
                 </div>
-                <div class="frequency">
-                    <span class="label">Taajuus:</span>
-                    <span id="frequency" class="value">-- Hz</span>
+                <div class="info-item">
+                    <span class="label">Laulettu:</span>
+                    <span id="detectedNote" class="value">--</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Tarkkuus:</span>
+                    <span id="centsOff" class="value">0 cents</span>
                 </div>
             </div>
 
-            <div class="tuner-meter">
-                <div class="meter-marks">
-                    <span class="mark">-50</span>
-                    <span class="mark">-25</span>
-                    <span class="mark center">0</span>
-                    <span class="mark">+25</span>
-                    <span class="mark">+50</span>
-                </div>
-                <div class="meter-bar">
-                    <div class="meter-center"></div>
-                    <div id="meterNeedle" class="meter-needle"></div>
-                </div>
-                <div class="cents-display">
-                    <span id="centsOff" class="cents">0</span>
-                    <span class="label">cents</span>
-                </div>
-            </div>
+            <canvas id="pitchCanvas" width="800" height="400"></canvas>
 
             <div class="accuracy-indicator">
                 <div id="accuracyStatus" class="status">Odottaa ääntä...</div>
@@ -705,53 +619,207 @@ function calculateCents(frequency, targetFrequency) {
     return Math.floor(1200 * Math.log2(frequency / targetFrequency));
 }
 
+// Get note name without octave (e.g., "A4" -> "A")
+function getNoteNameOnly(noteName) {
+    return noteName.replace(/[0-9]/g, '');
+}
+
+// Calculate octave-invariant cents (considers only the note, not octave)
+function calculateOctaveInvariantCents(frequency, targetNoteName) {
+    const detectedNote = frequencyToNote(frequency);
+    const detectedNoteName = getNoteNameOnly(detectedNote);
+    const targetNoteNameOnly = getNoteNameOnly(targetNoteName);
+
+    // Get the base frequency for the detected note in the same octave as target
+    const targetNoteMatch = targetNoteName.match(/([A-G]#?)(\d)/);
+    if (!targetNoteMatch) return { cents: 0, isCorrectNote: false };
+
+    const targetOctave = targetNoteMatch[2];
+    const detectedInTargetOctave = detectedNoteName + targetOctave;
+
+    // If this combination doesn't exist, try adjacent octaves
+    let targetFreq;
+    if (NOTE_FREQUENCIES[detectedInTargetOctave]) {
+        targetFreq = NOTE_FREQUENCIES[detectedInTargetOctave];
+    } else {
+        // Try octave below or above
+        const octaveBelow = detectedNoteName + (parseInt(targetOctave) - 1);
+        const octaveAbove = detectedNoteName + (parseInt(targetOctave) + 1);
+
+        if (NOTE_FREQUENCIES[octaveBelow]) {
+            targetFreq = NOTE_FREQUENCIES[octaveBelow];
+        } else if (NOTE_FREQUENCIES[octaveAbove]) {
+            targetFreq = NOTE_FREQUENCIES[octaveAbove];
+        } else {
+            return { cents: 0, isCorrectNote: false };
+        }
+    }
+
+    const cents = calculateCents(frequency, targetFreq);
+    const isCorrectNote = detectedNoteName === targetNoteNameOnly;
+
+    return { cents, isCorrectNote };
+}
+
+// Canvas visualization
+let pitchHistory = [];
+const maxHistoryLength = 150;
+
 function updateTunerDisplay(frequency) {
+    const canvas = document.getElementById('pitchCanvas');
+    const ctx = canvas.getContext('2d');
     const detectedNoteEl = document.getElementById('detectedNote');
-    const frequencyEl = document.getElementById('frequency');
     const centsOffEl = document.getElementById('centsOff');
-    const meterNeedle = document.getElementById('meterNeedle');
     const accuracyStatus = document.getElementById('accuracyStatus');
+    const targetNoteDisplay = document.getElementById('targetNoteDisplay');
+
+    // Get target note
+    const targetNote = document.getElementById('targetNote').value;
+    targetNoteDisplay.textContent = targetNote;
 
     if (frequency === -1 || frequency < 50 || frequency > 2000) {
         detectedNoteEl.textContent = '--';
-        frequencyEl.textContent = '-- Hz';
-        centsOffEl.textContent = '0';
-        meterNeedle.style.left = '50%';
+        centsOffEl.textContent = '0 cents';
         accuracyStatus.textContent = 'Odottaa ääntä...';
         accuracyStatus.className = 'status';
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawCenterLine(ctx, canvas);
+        pitchHistory = [];
         return;
     }
 
     const note = frequencyToNote(frequency);
-    const targetNote = document.getElementById('targetNote').value;
-    const targetFreq = NOTE_FREQUENCIES[targetNote];
-    const cents = calculateCents(frequency, targetFreq);
+    const { cents, isCorrectNote } = calculateOctaveInvariantCents(frequency, targetNote);
 
-    // Update display
+    // Update text displays
     detectedNoteEl.textContent = note;
-    frequencyEl.textContent = `${frequency.toFixed(1)} Hz`;
-    centsOffEl.textContent = `${cents > 0 ? '+' : ''}${cents}`;
+    centsOffEl.textContent = `${cents > 0 ? '+' : ''}${cents} cents`;
 
-    // Update meter needle position (50 cents = 25% of bar width)
-    const maxCents = 50;
-    const needlePosition = 50 + (cents / maxCents) * 25; // 50% center, ±25% for ±50 cents
-    const clampedPosition = Math.max(0, Math.min(100, needlePosition));
-    meterNeedle.style.left = `${clampedPosition}%`;
+    // Add to history
+    pitchHistory.push(cents);
+    if (pitchHistory.length > maxHistoryLength) {
+        pitchHistory.shift();
+    }
+
+    // Draw canvas
+    drawPitchVisualization(ctx, canvas, pitchHistory, cents, isCorrectNote);
 
     // Update accuracy status
-    const absCents = Math.abs(cents);
-    if (absCents <= 5) {
-        accuracyStatus.textContent = '🎯 Täydellinen!';
-        accuracyStatus.className = 'status perfect';
-    } else if (absCents <= 10) {
-        accuracyStatus.textContent = '✓ Erittäin hyvä';
-        accuracyStatus.className = 'status good';
-    } else if (absCents <= 25) {
-        accuracyStatus.textContent = 'Lähellä - jatka harjoittelua';
-        accuracyStatus.className = 'status close';
-    } else {
-        accuracyStatus.textContent = `${cents > 0 ? 'Liian korkea' : 'Liian matala'}`;
+    if (!isCorrectNote) {
+        accuracyStatus.textContent = `Väärä nuotti - laula ${getNoteNameOnly(targetNote)}`;
         accuracyStatus.className = 'status off';
+    } else {
+        const absCents = Math.abs(cents);
+        if (absCents <= 5) {
+            accuracyStatus.textContent = '🎯 Täydellinen!';
+            accuracyStatus.className = 'status perfect';
+        } else if (absCents <= 10) {
+            accuracyStatus.textContent = '✓ Erittäin hyvä';
+            accuracyStatus.className = 'status good';
+        } else if (absCents <= 25) {
+            accuracyStatus.textContent = 'Lähellä - jatka harjoittelua';
+            accuracyStatus.className = 'status close';
+        } else {
+            accuracyStatus.textContent = `${cents > 0 ? 'Liian korkea' : 'Liian matala'}`;
+            accuracyStatus.className = 'status off';
+        }
+    }
+}
+
+function drawCenterLine(ctx, canvas) {
+    const centerY = canvas.height / 2;
+
+    // Draw center line (target)
+    ctx.strokeStyle = '#28a745';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([10, 5]);
+    ctx.beginPath();
+    ctx.moveTo(0, centerY);
+    ctx.lineTo(canvas.width, centerY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+}
+
+function drawPitchVisualization(ctx, canvas, history, currentCents, isCorrectNote) {
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const centerY = canvas.height / 2;
+    const maxCents = 50; // Show ±50 cents range
+    const pixelsPerCent = (canvas.height * 0.8) / (maxCents * 2);
+
+    // Draw grid lines
+    ctx.strokeStyle = '#e0e0e0';
+    ctx.lineWidth = 1;
+
+    // Draw ±25 cents lines
+    for (let cents of [-25, 25]) {
+        const y = centerY - (cents * pixelsPerCent);
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+
+        // Label
+        ctx.fillStyle = '#999';
+        ctx.font = '12px sans-serif';
+        ctx.fillText(`${cents > 0 ? '+' : ''}${cents}`, 10, y - 5);
+    }
+
+    // Draw center line (target)
+    drawCenterLine(ctx, canvas);
+
+    // Label center
+    ctx.fillStyle = '#28a745';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillText('Tavoite (0)', 10, centerY - 10);
+
+    // Draw pitch history line
+    if (history.length > 1) {
+        const spacing = canvas.width / maxHistoryLength;
+
+        ctx.lineWidth = 3;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+
+        for (let i = 1; i < history.length; i++) {
+            const x1 = (i - 1) * spacing;
+            const x2 = i * spacing;
+            const y1 = centerY - (history[i - 1] * pixelsPerCent);
+            const y2 = centerY - (history[i] * pixelsPerCent);
+
+            // Color based on accuracy
+            const cents = history[i];
+            const absCents = Math.abs(cents);
+
+            if (!isCorrectNote && i === history.length - 1) {
+                ctx.strokeStyle = '#dc3545';
+            } else if (absCents <= 5) {
+                ctx.strokeStyle = '#28a745';
+            } else if (absCents <= 10) {
+                ctx.strokeStyle = '#5cb85c';
+            } else if (absCents <= 25) {
+                ctx.strokeStyle = '#ffc107';
+            } else {
+                ctx.strokeStyle = '#dc3545';
+            }
+
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+        }
+
+        // Draw current position dot
+        const lastX = (history.length - 1) * spacing;
+        const lastY = centerY - (currentCents * pixelsPerCent);
+
+        ctx.fillStyle = isCorrectNote && Math.abs(currentCents) <= 5 ? '#28a745' : '#667eea';
+        ctx.beginPath();
+        ctx.arc(lastX, lastY, 6, 0, Math.PI * 2);
+        ctx.fill();
     }
 }
 
