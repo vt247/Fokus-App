@@ -460,41 +460,40 @@ let droneVolume = null;
 let referenceNote = null;
 let isPlaying = false;
 let isReferencePlaying = false;
+let tanpuraLoop = null;
 
 function initializeDrone() {
     // Create a rich tanpura-like drone sound with reverb
     droneVolume = new Tone.Volume(-12).toDestination();
     const reverb = new Tone.Reverb({
-        decay: 8,
+        decay: 10,
         preDelay: 0.01
     }).connect(droneVolume);
 
-    // Rich tanpura-style synth with metallic resonance
+    // Tanpura-style synth with buzzy, metallic character
     drone = new Tone.PolySynth(Tone.Synth, {
         oscillator: {
-            type: 'fatsawtooth', // Rich harmonic content
-            count: 3,
-            spread: 40
+            type: 'sawtooth4', // Rich harmonics for string-like sound
         },
         envelope: {
-            attack: 0.8,
-            decay: 2,
-            sustain: 0.7,
-            release: 12 // Very long release for sympathetic resonance
+            attack: 0.002, // Very fast attack for pluck
+            decay: 0.8,
+            sustain: 0.3,
+            release: 8 // Long release for sympathetic resonance
         },
         filter: {
-            type: 'lowpass',
-            frequency: 2000,
+            type: 'bandpass',
+            frequency: 1200,
             rolloff: -12,
-            Q: 8 // High resonance
+            Q: 15 // High Q for metallic/buzzy character (jawari effect)
         },
         filterEnvelope: {
-            attack: 0.5,
-            decay: 1.5,
-            sustain: 0.5,
-            release: 8,
-            baseFrequency: 200,
-            octaves: 3
+            attack: 0.02,
+            decay: 0.3,
+            sustain: 0.4,
+            release: 6,
+            baseFrequency: 800,
+            octaves: 2
         }
     }).connect(reverb);
 
@@ -516,22 +515,51 @@ async function startDrone() {
     await Tone.start();
     const rootNote = document.getElementById('rootNote').value;
 
-    // Play tanpura-style notes: root, fifth, octave
-    const root = rootNote;
-    const fifth = Tone.Frequency(rootNote).transpose(7).toNote();
-    const octave = Tone.Frequency(rootNote).transpose(12).toNote();
+    // Tanpura strings: Sa (root), Pa (fifth), Sa (octave), SA (upper octave)
+    const strings = [
+        rootNote,
+        Tone.Frequency(rootNote).transpose(7).toNote(),  // Fifth (Pa)
+        Tone.Frequency(rootNote).transpose(12).toNote(), // Octave
+        rootNote  // Root again
+    ];
 
-    // Trigger the drone notes
-    drone.triggerAttack([root, fifth, octave]);
+    // Traditional tanpura plucking pattern: cyclic strumming
+    // Pattern: string 1, pause, string 2, pause, string 3, pause, string 4, pause
+    let stringIndex = 0;
+
+    if (tanpuraLoop) {
+        tanpuraLoop.stop();
+        tanpuraLoop.dispose();
+    }
+
+    tanpuraLoop = new Tone.Loop((time) => {
+        // Pluck current string
+        drone.triggerAttackRelease(strings[stringIndex], '2n', time);
+
+        // Move to next string
+        stringIndex = (stringIndex + 1) % strings.length;
+    }, '0.5n'); // Pluck every half note (adjustable tempo)
+
+    tanpuraLoop.start(0);
+    Tone.Transport.start();
 
     isPlaying = true;
     updateDroneButtons();
 }
 
 function stopDrone() {
+    if (tanpuraLoop) {
+        tanpuraLoop.stop();
+        tanpuraLoop.dispose();
+        tanpuraLoop = null;
+    }
+
     if (drone) {
         drone.releaseAll();
     }
+
+    Tone.Transport.stop();
+
     isPlaying = false;
     updateDroneButtons();
 }
@@ -735,7 +763,7 @@ function calculateOctaveInvariantCents(frequency, targetNoteName) {
 let pitchHistory = [];
 const maxHistoryLength = 150;
 let smoothedCents = 0;
-const smoothingFactor = 0.3; // Lower = smoother (0-1)
+const smoothingFactor = 0.15; // Lower = smoother (0-1) - optimized for learning
 
 function updateTunerDisplay(frequency) {
     const canvas = document.getElementById('pitchCanvas');
@@ -840,22 +868,53 @@ function drawPitchVisualization(ctx, canvas, history, currentCents, isCorrectNot
     const maxCents = 50; // Show ±50 cents range
     const pixelsPerCent = (canvas.height * 0.8) / (maxCents * 2);
 
+    // Draw colored target zones as background
+    // ±5 cents = Professional (dark green)
+    const zone5Top = centerY - (5 * pixelsPerCent);
+    const zone5Bottom = centerY + (5 * pixelsPerCent);
+    ctx.fillStyle = 'rgba(40, 167, 69, 0.15)'; // Green with transparency
+    ctx.fillRect(0, zone5Top, canvas.width, zone5Bottom - zone5Top);
+
+    // ±10 cents = Very good (light green)
+    const zone10Top = centerY - (10 * pixelsPerCent);
+    const zone10Bottom = centerY + (10 * pixelsPerCent);
+    ctx.fillStyle = 'rgba(92, 184, 92, 0.1)';
+    ctx.fillRect(0, zone10Top, canvas.width, zone5Top - zone10Top);
+    ctx.fillRect(0, zone5Bottom, canvas.width, zone10Bottom - zone5Bottom);
+
+    // ±15 cents = Acceptable (yellow)
+    const zone15Top = centerY - (15 * pixelsPerCent);
+    const zone15Bottom = centerY + (15 * pixelsPerCent);
+    ctx.fillStyle = 'rgba(255, 193, 7, 0.08)';
+    ctx.fillRect(0, zone15Top, canvas.width, zone10Top - zone15Top);
+    ctx.fillRect(0, zone10Bottom, canvas.width, zone15Bottom - zone10Bottom);
+
     // Draw grid lines
     ctx.strokeStyle = '#e0e0e0';
     ctx.lineWidth = 1;
 
-    // Draw ±25 cents lines
-    for (let cents of [-25, 25]) {
+    // Draw ±5, ±10, ±15, ±25 cents lines with labels
+    for (let cents of [-25, -15, -10, -5, 5, 10, 15, 25]) {
         const y = centerY - (cents * pixelsPerCent);
+        ctx.strokeStyle = Math.abs(cents) <= 5 ? 'rgba(40, 167, 69, 0.4)' :
+                         Math.abs(cents) <= 10 ? 'rgba(92, 184, 92, 0.3)' :
+                         Math.abs(cents) <= 15 ? 'rgba(255, 193, 7, 0.3)' : '#e0e0e0';
+        ctx.lineWidth = Math.abs(cents) <= 15 ? 1.5 : 1;
         ctx.beginPath();
         ctx.moveTo(0, y);
         ctx.lineTo(canvas.width, y);
         ctx.stroke();
 
         // Label
-        ctx.fillStyle = '#999';
-        ctx.font = '12px sans-serif';
-        ctx.fillText(`${cents > 0 ? '+' : ''}${cents}`, 10, y - 5);
+        if (Math.abs(cents) === 5 || Math.abs(cents) === 10 || Math.abs(cents) === 15 || Math.abs(cents) === 25) {
+            ctx.fillStyle = '#999';
+            ctx.font = '11px sans-serif';
+            const label = Math.abs(cents) === 5 ? `${cents > 0 ? '+' : ''}${cents} (ammatti)` :
+                         Math.abs(cents) === 10 ? `${cents > 0 ? '+' : ''}${cents} (hyvä)` :
+                         Math.abs(cents) === 15 ? `${cents > 0 ? '+' : ''}${cents} (ok)` :
+                         `${cents > 0 ? '+' : ''}${cents}`;
+            ctx.fillText(label, 10, y - 5);
+        }
     }
 
     // Draw center line (target)
@@ -864,7 +923,7 @@ function drawPitchVisualization(ctx, canvas, history, currentCents, isCorrectNot
     // Label center
     ctx.fillStyle = '#28a745';
     ctx.font = 'bold 14px sans-serif';
-    ctx.fillText('Tavoite (0)', 10, centerY - 10);
+    ctx.fillText('🎯 Tavoite (0)', 10, centerY - 10);
 
     // Draw pitch history line
     if (history.length > 1) {
@@ -1015,6 +1074,9 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('beforeunload', () => {
     stopDrone();
     stopMicrophone();
+    if (isReferencePlaying) {
+        referenceNote.triggerRelease();
+    }
 });
     </script>
 </body>
