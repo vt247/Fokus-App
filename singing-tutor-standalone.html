@@ -569,6 +569,9 @@ async function startDrone() {
     await Tone.start();
     const rootNote = document.getElementById('rootNote').value;
 
+    // Automatically sync target note with drone
+    document.getElementById('targetNote').value = rootNote;
+
     // Play tanpura-style notes: root, fifth, octave, and upper root
     const root = rootNote;
     const fifth = Tone.Frequency(rootNote).transpose(7).toNote();
@@ -613,7 +616,7 @@ let analyser = null;
 let microphone = null;
 let rafId = null;
 
-// Autocorrelation-based pitch detection
+// Improved autocorrelation-based pitch detection (YIN-style)
 function autoCorrelate(buffer, sampleRate) {
     const SIZE = buffer.length;
     const MAX_SAMPLES = Math.floor(SIZE / 2);
@@ -628,34 +631,65 @@ function autoCorrelate(buffer, sampleRate) {
     }
     rms = Math.sqrt(rms / SIZE);
 
-    // Not enough signal
-    if (rms < 0.01) return -1;
+    // Not enough signal - increased threshold
+    if (rms < 0.005) return -1;
 
-    // Find the first zero crossing
-    let lastCorrelation = 1;
-    for (let offset = 1; offset < MAX_SAMPLES; offset++) {
+    // Autocorrelation
+    const correlations = new Array(MAX_SAMPLES);
+    for (let offset = 0; offset < MAX_SAMPLES; offset++) {
         let correlation = 0;
-
         for (let i = 0; i < MAX_SAMPLES; i++) {
             correlation += Math.abs(buffer[i] - buffer[i + offset]);
         }
+        correlations[offset] = correlation;
+    }
 
-        correlation = 1 - (correlation / MAX_SAMPLES);
+    // Difference function normalization (YIN)
+    let d = 0;
+    const yinBuffer = new Array(MAX_SAMPLES);
+    yinBuffer[0] = 1;
 
-        if (correlation > 0.9 && correlation > lastCorrelation) {
-            const foundGoodCorrelation = correlation > best_correlation;
-            if (foundGoodCorrelation) {
-                best_correlation = correlation;
-                best_offset = offset;
-            }
+    for (let offset = 1; offset < MAX_SAMPLES; offset++) {
+        d += correlations[offset];
+        if (d === 0) {
+            yinBuffer[offset] = 1;
+        } else {
+            yinBuffer[offset] = correlations[offset] / (d / offset);
         }
-        lastCorrelation = correlation;
     }
 
-    if (best_correlation > 0.01 && best_offset !== -1) {
-        const fundamental = sampleRate / best_offset;
-        return fundamental;
+    // Find the best offset with threshold
+    const threshold = 0.1;
+    let minOffset = -1;
+
+    for (let offset = 2; offset < MAX_SAMPLES; offset++) {
+        if (yinBuffer[offset] < threshold) {
+            while (offset + 1 < MAX_SAMPLES && yinBuffer[offset + 1] < yinBuffer[offset]) {
+                offset++;
+            }
+            minOffset = offset;
+            break;
+        }
     }
+
+    if (minOffset !== -1) {
+        // Parabolic interpolation for better accuracy
+        let betterOffset = minOffset;
+        if (minOffset > 0 && minOffset < MAX_SAMPLES - 1) {
+            const s0 = yinBuffer[minOffset - 1];
+            const s1 = yinBuffer[minOffset];
+            const s2 = yinBuffer[minOffset + 1];
+            betterOffset = minOffset + (s2 - s0) / (2 * (2 * s1 - s2 - s0));
+        }
+
+        const fundamental = sampleRate / betterOffset;
+
+        // Filter out unrealistic frequencies
+        if (fundamental >= 50 && fundamental <= 2000) {
+            return fundamental;
+        }
+    }
+
     return -1;
 }
 
@@ -736,9 +770,16 @@ async function startMicrophone() {
     try {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         analyser = audioContext.createAnalyser();
-        analyser.fftSize = 2048;
+        analyser.fftSize = 4096; // Larger buffer for better low-frequency detection
+        analyser.smoothingTimeConstant = 0.8;
 
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false
+            }
+        });
         microphone = audioContext.createMediaStreamSource(stream);
         microphone.connect(analyser);
 
@@ -783,8 +824,11 @@ document.addEventListener('DOMContentLoaded', () => {
         updateDroneVolume(parseFloat(e.target.value));
     });
 
-    // Root note change - restart drone if playing
+    // Root note change - sync target note and restart drone if playing
     document.getElementById('rootNote').addEventListener('change', () => {
+        const rootNote = document.getElementById('rootNote').value;
+        document.getElementById('targetNote').value = rootNote;
+
         if (isPlaying) {
             stopDrone();
             setTimeout(startDrone, 100);
