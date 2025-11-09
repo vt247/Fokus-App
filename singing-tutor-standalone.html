@@ -168,20 +168,17 @@ h2 {
     border: none;
 }
 
-.target-note {
-    display: flex;
-    gap: 10px;
-    align-items: center;
+.info-text {
+    padding: 15px;
+    background: white;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
 }
 
-.target-note label {
-    font-weight: 600;
-    color: #555;
-    white-space: nowrap;
-}
-
-.target-note .select {
-    flex: 1;
+.info-text p {
+    margin: 0;
+    color: #666;
+    line-height: 1.6;
 }
 
 /* Tuner Display */
@@ -348,32 +345,14 @@ h2 {
             </div>
 
             <div class="control-group">
-                <h2>Pitch Detection (Mikrofoni)</h2>
+                <h2>Mikrofoni</h2>
                 <div class="button-group">
                     <button id="startMic" class="btn btn-primary">🎤 Aloita kuuntelu</button>
                     <button id="stopMic" class="btn btn-secondary" disabled>⏹ Lopeta kuuntelu</button>
                 </div>
 
-                <div class="target-note">
-                    <label for="targetNote">Tavoitenuotti:</label>
-                    <select id="targetNote" class="select">
-                        <option value="C3">C3</option>
-                        <option value="D3">D3</option>
-                        <option value="E3">E3</option>
-                        <option value="F3">F3</option>
-                        <option value="G3">G3</option>
-                        <option value="A3">A3</option>
-                        <option value="B3">B3</option>
-                        <option value="C4" selected>C4 (Middle C)</option>
-                        <option value="D4">D4</option>
-                        <option value="E4">E4</option>
-                        <option value="F4">F4</option>
-                        <option value="G4">G4</option>
-                        <option value="A4">A4 (440 Hz)</option>
-                        <option value="B4">B4</option>
-                        <option value="C5">C5</option>
-                    </select>
-                    <button id="playTarget" class="btn btn-small">▶ Soita</button>
+                <div class="info-text">
+                    <p>Käynnistä mikrofoni ja laula dronen mukana. Sovellus näyttää kuinka tarkasti osut nuottiin.</p>
                 </div>
             </div>
         </div>
@@ -437,31 +416,39 @@ let referenceNote = null;
 let isPlaying = false;
 
 function initializeDrone() {
-    // Create a rich tanpura-like drone sound with multiple oscillators
+    // Create a rich tanpura-like drone sound with reverb
     droneVolume = new Tone.Volume(-12).toDestination();
-    const reverb = new Tone.Reverb(3).connect(droneVolume);
+    const reverb = new Tone.Reverb({
+        decay: 8,
+        preDelay: 0.01
+    }).connect(droneVolume);
 
-    // PolySynth for multiple simultaneous notes (tanpura style)
-    drone = new Tone.PolySynth(Tone.FMSynth, {
-        harmonicity: 3,
-        modulationIndex: 10,
+    // Rich tanpura-style synth with metallic resonance
+    drone = new Tone.PolySynth(Tone.Synth, {
         oscillator: {
-            type: 'sine'
+            type: 'fatsawtooth', // Rich harmonic content
+            count: 3,
+            spread: 40
         },
         envelope: {
-            attack: 2,
-            decay: 0,
-            sustain: 1,
-            release: 4
+            attack: 0.8,
+            decay: 2,
+            sustain: 0.7,
+            release: 12 // Very long release for sympathetic resonance
         },
-        modulation: {
-            type: 'square'
+        filter: {
+            type: 'lowpass',
+            frequency: 2000,
+            rolloff: -12,
+            Q: 8 // High resonance
         },
-        modulationEnvelope: {
+        filterEnvelope: {
             attack: 0.5,
-            decay: 0,
-            sustain: 1,
-            release: 1
+            decay: 1.5,
+            sustain: 0.5,
+            release: 8,
+            baseFrequency: 200,
+            octaves: 3
         }
     }).connect(reverb);
 
@@ -483,10 +470,7 @@ async function startDrone() {
     await Tone.start();
     const rootNote = document.getElementById('rootNote').value;
 
-    // Automatically sync target note with drone
-    document.getElementById('targetNote').value = rootNote;
-
-    // Play tanpura-style notes: root, fifth, octave, and upper root
+    // Play tanpura-style notes: root, fifth, octave
     const root = rootNote;
     const fifth = Tone.Frequency(rootNote).transpose(7).toNote();
     const octave = Tone.Frequency(rootNote).transpose(12).toNote();
@@ -520,8 +504,8 @@ function updateDroneVolume(value) {
 
 async function playReferenceNote() {
     await Tone.start();
-    const targetNote = document.getElementById('targetNote').value;
-    referenceNote.triggerAttackRelease(targetNote, '1n');
+    const rootNote = document.getElementById('rootNote').value;
+    referenceNote.triggerAttackRelease(rootNote, '1n');
 }
 
 // ============ PITCH DETECTION ============
@@ -664,6 +648,8 @@ function calculateOctaveInvariantCents(frequency, targetNoteName) {
 // Canvas visualization
 let pitchHistory = [];
 const maxHistoryLength = 150;
+let smoothedCents = 0;
+const smoothingFactor = 0.3; // Lower = smoother (0-1)
 
 function updateTunerDisplay(frequency) {
     const canvas = document.getElementById('pitchCanvas');
@@ -673,8 +659,8 @@ function updateTunerDisplay(frequency) {
     const accuracyStatus = document.getElementById('accuracyStatus');
     const targetNoteDisplay = document.getElementById('targetNoteDisplay');
 
-    // Get target note
-    const targetNote = document.getElementById('targetNote').value;
+    // Get target note from root note
+    const targetNote = document.getElementById('rootNote').value;
     targetNoteDisplay.textContent = targetNote;
 
     if (frequency === -1 || frequency < 50 || frequency > 2000) {
@@ -683,28 +669,32 @@ function updateTunerDisplay(frequency) {
         accuracyStatus.textContent = 'Odottaa ääntä...';
         accuracyStatus.className = 'status';
 
-        // Clear canvas
+        // Clear canvas but keep drawing center line
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         drawCenterLine(ctx, canvas);
         pitchHistory = [];
+        smoothedCents = 0;
         return;
     }
 
     const note = frequencyToNote(frequency);
     const { cents, isCorrectNote } = calculateOctaveInvariantCents(frequency, targetNote);
 
+    // Apply smoothing to cents for smoother visualization
+    smoothedCents = smoothedCents * (1 - smoothingFactor) + cents * smoothingFactor;
+
     // Update text displays
     detectedNoteEl.textContent = note;
     centsOffEl.textContent = `${cents > 0 ? '+' : ''}${cents} cents`;
 
-    // Add to history
-    pitchHistory.push(cents);
+    // Add smoothed value to history
+    pitchHistory.push(smoothedCents);
     if (pitchHistory.length > maxHistoryLength) {
         pitchHistory.shift();
     }
 
-    // Draw canvas
-    drawPitchVisualization(ctx, canvas, pitchHistory, cents, isCorrectNote);
+    // Draw canvas - always show the line
+    drawPitchVisualization(ctx, canvas, pitchHistory, smoothedCents, isCorrectNote);
 
     // Update accuracy status
     if (!isCorrectNote) {
@@ -892,11 +882,8 @@ document.addEventListener('DOMContentLoaded', () => {
         updateDroneVolume(parseFloat(e.target.value));
     });
 
-    // Root note change - sync target note and restart drone if playing
+    // Root note change - restart drone if playing
     document.getElementById('rootNote').addEventListener('change', () => {
-        const rootNote = document.getElementById('rootNote').value;
-        document.getElementById('targetNote').value = rootNote;
-
         if (isPlaying) {
             stopDrone();
             setTimeout(startDrone, 100);
@@ -906,9 +893,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Microphone controls
     document.getElementById('startMic').addEventListener('click', startMicrophone);
     document.getElementById('stopMic').addEventListener('click', stopMicrophone);
-
-    // Reference note
-    document.getElementById('playTarget').addEventListener('click', playReferenceNote);
 });
 
 // Cleanup on page unload
