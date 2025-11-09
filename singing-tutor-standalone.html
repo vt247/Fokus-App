@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laulunopetus - Pitch Trainer</title>
+    <style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 20px;
+    color: #333;
+}
+
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+h1 {
+    text-align: center;
+    color: #667eea;
+    margin-bottom: 30px;
+    font-size: 2.5rem;
+}
+
+h2 {
+    color: #555;
+    font-size: 1.3rem;
+    margin-bottom: 15px;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 8px;
+}
+
+.controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    margin-bottom: 30px;
+}
+
+.control-group {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 12px;
+    border: 2px solid #e9ecef;
+}
+
+.button-group {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.btn {
+    flex: 1;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: #5a6268;
+}
+
+.btn-small {
+    padding: 8px 16px;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-small:hover {
+    background: #218838;
+    transform: translateY(-1px);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.slider-group {
+    margin-bottom: 20px;
+}
+
+.slider-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #555;
+}
+
+.select {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    font-size: 1rem;
+    background: white;
+    cursor: pointer;
+}
+
+.select:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.slider {
+    width: 100%;
+    height: 6px;
+    border-radius: 5px;
+    background: #dee2e6;
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #667eea;
+    cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #667eea;
+    cursor: pointer;
+    border: none;
+}
+
+.target-note {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.target-note label {
+    font-weight: 600;
+    color: #555;
+    white-space: nowrap;
+}
+
+.target-note .select {
+    flex: 1;
+}
+
+/* Tuner Display */
+.tuner-display {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    padding: 30px;
+    border-radius: 12px;
+    margin-bottom: 30px;
+    border: 3px solid #667eea;
+}
+
+.frequency-display {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.detected-note, .frequency {
+    flex: 1;
+}
+
+.detected-note .note {
+    display: block;
+    font-size: 3rem;
+    font-weight: bold;
+    color: #667eea;
+    margin-top: 10px;
+}
+
+.frequency .value {
+    display: block;
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: #764ba2;
+    margin-top: 10px;
+}
+
+.label {
+    font-size: 0.9rem;
+    color: #666;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Tuner Meter */
+.tuner-meter {
+    margin-bottom: 20px;
+}
+
+.meter-marks {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    padding: 0 10px;
+}
+
+.meter-marks .mark {
+    font-size: 0.8rem;
+    color: #666;
+    font-weight: 600;
+}
+
+.meter-marks .mark.center {
+    color: #28a745;
+    font-weight: bold;
+    font-size: 1rem;
+}
+
+.meter-bar {
+    position: relative;
+    height: 40px;
+    background: linear-gradient(to right,
+        #dc3545 0%,
+        #ffc107 25%,
+        #28a745 45%,
+        #28a745 55%,
+        #ffc107 75%,
+        #dc3545 100%
+    );
+    border-radius: 20px;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.2);
+    overflow: hidden;
+}
+
+.meter-center {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 3px;
+    height: 100%;
+    background: white;
+    box-shadow: 0 0 5px rgba(0,0,0,0.5);
+    z-index: 1;
+}
+
+.meter-needle {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 4px;
+    height: 100%;
+    background: #333;
+    box-shadow: 0 0 10px rgba(0,0,0,0.8);
+    transform: translateX(-50%);
+    transition: left 0.1s ease;
+    z-index: 2;
+}
+
+.cents-display {
+    text-align: center;
+    margin-top: 15px;
+}
+
+.cents-display .cents {
+    display: inline-block;
+    font-size: 2rem;
+    font-weight: bold;
+    color: #333;
+    min-width: 80px;
+}
+
+.accuracy-indicator {
+    text-align: center;
+    padding: 15px;
+    border-radius: 8px;
+    background: white;
+}
+
+.accuracy-indicator .status {
+    font-size: 1.2rem;
+    font-weight: 600;
+    padding: 10px;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+}
+
+.status.perfect {
+    background: #28a745;
+    color: white;
+}
+
+.status.good {
+    background: #5cb85c;
+    color: white;
+}
+
+.status.close {
+    background: #ffc107;
+    color: #333;
+}
+
+.status.off {
+    background: #dc3545;
+    color: white;
+}
+
+/* Info Section */
+.info {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 12px;
+    border-left: 4px solid #667eea;
+}
+
+.info p {
+    margin-bottom: 10px;
+    font-weight: 600;
+    color: #555;
+}
+
+.info ul {
+    list-style-position: inside;
+    color: #666;
+    line-height: 1.8;
+}
+
+.info li {
+    margin-bottom: 5px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .controls {
+        grid-template-columns: 1fr;
+    }
+
+    h1 {
+        font-size: 2rem;
+    }
+
+    .detected-note .note {
+        font-size: 2rem;
+    }
+
+    .frequency .value {
+        font-size: 1.5rem;
+    }
+}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 Laulunopetus Sovellus</h1>
+
+        <div class="controls">
+            <div class="control-group">
+                <h2>Drone (Tanpura)</h2>
+                <div class="button-group">
+                    <button id="startDrone" class="btn btn-primary">▶ Käynnistä Drone</button>
+                    <button id="stopDrone" class="btn btn-secondary" disabled>⏸ Pysäytä Drone</button>
+                </div>
+
+                <div class="slider-group">
+                    <label for="rootNote">Perusnuotti:</label>
+                    <select id="rootNote" class="select">
+                        <option value="C3">C (matala)</option>
+                        <option value="C#3">C#</option>
+                        <option value="D3">D</option>
+                        <option value="D#3">D#</option>
+                        <option value="E3">E</option>
+                        <option value="F3">F</option>
+                        <option value="F#3">F#</option>
+                        <option value="G3">G</option>
+                        <option value="G#3">G#</option>
+                        <option value="A3" selected>A</option>
+                        <option value="A#3">A#</option>
+                        <option value="B3">B</option>
+                        <option value="C4">C (keski)</option>
+                    </select>
+                </div>
+
+                <div class="slider-group">
+                    <label for="droneVolume">Äänenvoimakkuus: <span id="volumeValue">-12 dB</span></label>
+                    <input type="range" id="droneVolume" min="-40" max="0" value="-12" class="slider">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h2>Pitch Detection (Mikrofoni)</h2>
+                <div class="button-group">
+                    <button id="startMic" class="btn btn-primary">🎤 Aloita kuuntelu</button>
+                    <button id="stopMic" class="btn btn-secondary" disabled>⏹ Lopeta kuuntelu</button>
+                </div>
+
+                <div class="target-note">
+                    <label for="targetNote">Tavoitenuotti:</label>
+                    <select id="targetNote" class="select">
+                        <option value="C3">C3</option>
+                        <option value="D3">D3</option>
+                        <option value="E3">E3</option>
+                        <option value="F3">F3</option>
+                        <option value="G3">G3</option>
+                        <option value="A3">A3</option>
+                        <option value="B3">B3</option>
+                        <option value="C4" selected>C4 (Middle C)</option>
+                        <option value="D4">D4</option>
+                        <option value="E4">E4</option>
+                        <option value="F4">F4</option>
+                        <option value="G4">G4</option>
+                        <option value="A4">A4 (440 Hz)</option>
+                        <option value="B4">B4</option>
+                        <option value="C5">C5</option>
+                    </select>
+                    <button id="playTarget" class="btn btn-small">▶ Soita</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="tuner-display">
+            <div class="frequency-display">
+                <div class="detected-note">
+                    <span class="label">Tunnistettu nuotti:</span>
+                    <span id="detectedNote" class="note">--</span>
+                </div>
+                <div class="frequency">
+                    <span class="label">Taajuus:</span>
+                    <span id="frequency" class="value">-- Hz</span>
+                </div>
+            </div>
+
+            <div class="tuner-meter">
+                <div class="meter-marks">
+                    <span class="mark">-50</span>
+                    <span class="mark">-25</span>
+                    <span class="mark center">0</span>
+                    <span class="mark">+25</span>
+                    <span class="mark">+50</span>
+                </div>
+                <div class="meter-bar">
+                    <div class="meter-center"></div>
+                    <div id="meterNeedle" class="meter-needle"></div>
+                </div>
+                <div class="cents-display">
+                    <span id="centsOff" class="cents">0</span>
+                    <span class="label">cents</span>
+                </div>
+            </div>
+
+            <div class="accuracy-indicator">
+                <div id="accuracyStatus" class="status">Odottaa ääntä...</div>
+            </div>
+        </div>
+
+        <div class="info">
+            <p><strong>Käyttöohje:</strong></p>
+            <ul>
+                <li>Käynnistä Drone saadaksesi taustanuotin laulamiseen</li>
+                <li>Valitse tavoitenuotti ja käynnistä mikrofoni</li>
+                <li>Laula valittua nuottia - mittari näyttää kuinka tarkasti osut</li>
+                <li>0 cents = täydellinen osuma, ±5 cents = erittäin hyvä, ±50 cents = puoli sävelaskelta viereinen</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Include Tone.js from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
+    <script>
+// Laulunopetus Sovellus - Main JavaScript
+
+// ============ CONSTANTS & NOTE FREQUENCIES ============
+const NOTE_FREQUENCIES = {
+    'C3': 130.81, 'C#3': 138.59, 'D3': 146.83, 'D#3': 155.56, 'E3': 164.81,
+    'F3': 174.61, 'F#3': 185.00, 'G3': 196.00, 'G#3': 207.65, 'A3': 220.00,
+    'A#3': 233.08, 'B3': 246.94,
+    'C4': 261.63, 'C#4': 277.18, 'D4': 293.66, 'D#4': 311.13, 'E4': 329.63,
+    'F4': 349.23, 'F#4': 369.99, 'G4': 392.00, 'G#4': 415.30, 'A4': 440.00,
+    'A#4': 466.16, 'B4': 493.88,
+    'C5': 523.25, 'C#5': 554.37, 'D5': 587.33
+};
+
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+// ============ DRONE SYNTH ============
+let drone = null;
+let droneVolume = null;
+let referenceNote = null;
+let isPlaying = false;
+
+function initializeDrone() {
+    // Create a rich tanpura-like drone sound with multiple oscillators
+    droneVolume = new Tone.Volume(-12).toDestination();
+    const reverb = new Tone.Reverb(3).connect(droneVolume);
+
+    // PolySynth for multiple simultaneous notes (tanpura style)
+    drone = new Tone.PolySynth(Tone.FMSynth, {
+        harmonicity: 3,
+        modulationIndex: 10,
+        oscillator: {
+            type: 'sine'
+        },
+        envelope: {
+            attack: 2,
+            decay: 0,
+            sustain: 1,
+            release: 4
+        },
+        modulation: {
+            type: 'square'
+        },
+        modulationEnvelope: {
+            attack: 0.5,
+            decay: 0,
+            sustain: 1,
+            release: 1
+        }
+    }).connect(reverb);
+
+    // Reference note synth (simple sine wave)
+    referenceNote = new Tone.Synth({
+        oscillator: {
+            type: 'sine'
+        },
+        envelope: {
+            attack: 0.1,
+            decay: 0.2,
+            sustain: 0.5,
+            release: 1
+        }
+    }).toDestination();
+}
+
+async function startDrone() {
+    await Tone.start();
+    const rootNote = document.getElementById('rootNote').value;
+
+    // Play tanpura-style notes: root, fifth, octave, and upper root
+    const root = rootNote;
+    const fifth = Tone.Frequency(rootNote).transpose(7).toNote();
+    const octave = Tone.Frequency(rootNote).transpose(12).toNote();
+
+    // Trigger the drone notes
+    drone.triggerAttack([root, fifth, octave]);
+
+    isPlaying = true;
+    updateDroneButtons();
+}
+
+function stopDrone() {
+    if (drone) {
+        drone.releaseAll();
+    }
+    isPlaying = false;
+    updateDroneButtons();
+}
+
+function updateDroneButtons() {
+    document.getElementById('startDrone').disabled = isPlaying;
+    document.getElementById('stopDrone').disabled = !isPlaying;
+}
+
+function updateDroneVolume(value) {
+    if (droneVolume) {
+        droneVolume.volume.value = value;
+    }
+    document.getElementById('volumeValue').textContent = `${value} dB`;
+}
+
+async function playReferenceNote() {
+    await Tone.start();
+    const targetNote = document.getElementById('targetNote').value;
+    referenceNote.triggerAttackRelease(targetNote, '1n');
+}
+
+// ============ PITCH DETECTION ============
+let audioContext = null;
+let analyser = null;
+let microphone = null;
+let rafId = null;
+
+// Autocorrelation-based pitch detection
+function autoCorrelate(buffer, sampleRate) {
+    const SIZE = buffer.length;
+    const MAX_SAMPLES = Math.floor(SIZE / 2);
+    let best_offset = -1;
+    let best_correlation = 0;
+    let rms = 0;
+
+    // Calculate RMS (root mean square) to detect if there's enough signal
+    for (let i = 0; i < SIZE; i++) {
+        const val = buffer[i];
+        rms += val * val;
+    }
+    rms = Math.sqrt(rms / SIZE);
+
+    // Not enough signal
+    if (rms < 0.01) return -1;
+
+    // Find the first zero crossing
+    let lastCorrelation = 1;
+    for (let offset = 1; offset < MAX_SAMPLES; offset++) {
+        let correlation = 0;
+
+        for (let i = 0; i < MAX_SAMPLES; i++) {
+            correlation += Math.abs(buffer[i] - buffer[i + offset]);
+        }
+
+        correlation = 1 - (correlation / MAX_SAMPLES);
+
+        if (correlation > 0.9 && correlation > lastCorrelation) {
+            const foundGoodCorrelation = correlation > best_correlation;
+            if (foundGoodCorrelation) {
+                best_correlation = correlation;
+                best_offset = offset;
+            }
+        }
+        lastCorrelation = correlation;
+    }
+
+    if (best_correlation > 0.01 && best_offset !== -1) {
+        const fundamental = sampleRate / best_offset;
+        return fundamental;
+    }
+    return -1;
+}
+
+function frequencyToNote(frequency) {
+    const noteNum = 12 * (Math.log(frequency / 440) / Math.log(2));
+    const nearestNote = Math.round(noteNum) + 69; // 69 is A4
+    const noteIndex = (nearestNote - 12) % 12;
+    const octave = Math.floor((nearestNote - 12) / 12);
+    return NOTE_NAMES[noteIndex] + octave;
+}
+
+function calculateCents(frequency, targetFrequency) {
+    return Math.floor(1200 * Math.log2(frequency / targetFrequency));
+}
+
+function updateTunerDisplay(frequency) {
+    const detectedNoteEl = document.getElementById('detectedNote');
+    const frequencyEl = document.getElementById('frequency');
+    const centsOffEl = document.getElementById('centsOff');
+    const meterNeedle = document.getElementById('meterNeedle');
+    const accuracyStatus = document.getElementById('accuracyStatus');
+
+    if (frequency === -1 || frequency < 50 || frequency > 2000) {
+        detectedNoteEl.textContent = '--';
+        frequencyEl.textContent = '-- Hz';
+        centsOffEl.textContent = '0';
+        meterNeedle.style.left = '50%';
+        accuracyStatus.textContent = 'Odottaa ääntä...';
+        accuracyStatus.className = 'status';
+        return;
+    }
+
+    const note = frequencyToNote(frequency);
+    const targetNote = document.getElementById('targetNote').value;
+    const targetFreq = NOTE_FREQUENCIES[targetNote];
+    const cents = calculateCents(frequency, targetFreq);
+
+    // Update display
+    detectedNoteEl.textContent = note;
+    frequencyEl.textContent = `${frequency.toFixed(1)} Hz`;
+    centsOffEl.textContent = `${cents > 0 ? '+' : ''}${cents}`;
+
+    // Update meter needle position (50 cents = 25% of bar width)
+    const maxCents = 50;
+    const needlePosition = 50 + (cents / maxCents) * 25; // 50% center, ±25% for ±50 cents
+    const clampedPosition = Math.max(0, Math.min(100, needlePosition));
+    meterNeedle.style.left = `${clampedPosition}%`;
+
+    // Update accuracy status
+    const absCents = Math.abs(cents);
+    if (absCents <= 5) {
+        accuracyStatus.textContent = '🎯 Täydellinen!';
+        accuracyStatus.className = 'status perfect';
+    } else if (absCents <= 10) {
+        accuracyStatus.textContent = '✓ Erittäin hyvä';
+        accuracyStatus.className = 'status good';
+    } else if (absCents <= 25) {
+        accuracyStatus.textContent = 'Lähellä - jatka harjoittelua';
+        accuracyStatus.className = 'status close';
+    } else {
+        accuracyStatus.textContent = `${cents > 0 ? 'Liian korkea' : 'Liian matala'}`;
+        accuracyStatus.className = 'status off';
+    }
+}
+
+function detectPitch() {
+    const bufferLength = analyser.fftSize;
+    const buffer = new Float32Array(bufferLength);
+    analyser.getFloatTimeDomainData(buffer);
+
+    const frequency = autoCorrelate(buffer, audioContext.sampleRate);
+    updateTunerDisplay(frequency);
+
+    rafId = requestAnimationFrame(detectPitch);
+}
+
+async function startMicrophone() {
+    try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048;
+
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        microphone = audioContext.createMediaStreamSource(stream);
+        microphone.connect(analyser);
+
+        detectPitch();
+
+        document.getElementById('startMic').disabled = true;
+        document.getElementById('stopMic').disabled = false;
+    } catch (error) {
+        alert('Mikrofonin käyttö epäonnistui. Varmista, että olet antanut luvan mikrofonin käyttöön.');
+        console.error('Microphone error:', error);
+    }
+}
+
+function stopMicrophone() {
+    if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+    }
+
+    if (microphone && microphone.mediaStream) {
+        microphone.mediaStream.getTracks().forEach(track => track.stop());
+    }
+
+    if (audioContext) {
+        audioContext.close();
+        audioContext = null;
+    }
+
+    updateTunerDisplay(-1);
+    document.getElementById('startMic').disabled = false;
+    document.getElementById('stopMic').disabled = true;
+}
+
+// ============ EVENT LISTENERS ============
+document.addEventListener('DOMContentLoaded', () => {
+    initializeDrone();
+
+    // Drone controls
+    document.getElementById('startDrone').addEventListener('click', startDrone);
+    document.getElementById('stopDrone').addEventListener('click', stopDrone);
+    document.getElementById('droneVolume').addEventListener('input', (e) => {
+        updateDroneVolume(parseFloat(e.target.value));
+    });
+
+    // Root note change - restart drone if playing
+    document.getElementById('rootNote').addEventListener('change', () => {
+        if (isPlaying) {
+            stopDrone();
+            setTimeout(startDrone, 100);
+        }
+    });
+
+    // Microphone controls
+    document.getElementById('startMic').addEventListener('click', startMicrophone);
+    document.getElementById('stopMic').addEventListener('click', stopMicrophone);
+
+    // Reference note
+    document.getElementById('playTarget').addEventListener('click', playReferenceNote);
+});
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    stopDrone();
+    stopMicrophone();
+});
+    </script>
+</body>
+</html>
