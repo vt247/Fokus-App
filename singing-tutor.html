@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laulunopetus - Pitch Trainer</title>
+    <link rel="stylesheet" href="singing-tutor.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 Laulunopetus Sovellus</h1>
+
+        <div class="controls">
+            <div class="control-group">
+                <h2>Drone (Tanpura)</h2>
+                <div class="button-group">
+                    <button id="startDrone" class="btn btn-primary">▶ Käynnistä Drone</button>
+                    <button id="stopDrone" class="btn btn-secondary" disabled>⏸ Pysäytä Drone</button>
+                </div>
+
+                <div class="slider-group">
+                    <label for="rootNote">Perusnuotti:</label>
+                    <select id="rootNote" class="select">
+                        <option value="C3">C (matala)</option>
+                        <option value="C#3">C#</option>
+                        <option value="D3">D</option>
+                        <option value="D#3">D#</option>
+                        <option value="E3">E</option>
+                        <option value="F3">F</option>
+                        <option value="F#3">F#</option>
+                        <option value="G3">G</option>
+                        <option value="G#3">G#</option>
+                        <option value="A3" selected>A</option>
+                        <option value="A#3">A#</option>
+                        <option value="B3">B</option>
+                        <option value="C4">C (keski)</option>
+                    </select>
+                </div>
+
+                <div class="slider-group">
+                    <label for="droneVolume">Äänenvoimakkuus: <span id="volumeValue">-12 dB</span></label>
+                    <input type="range" id="droneVolume" min="-40" max="0" value="-12" class="slider">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h2>Pitch Detection (Mikrofoni)</h2>
+                <div class="button-group">
+                    <button id="startMic" class="btn btn-primary">🎤 Aloita kuuntelu</button>
+                    <button id="stopMic" class="btn btn-secondary" disabled>⏹ Lopeta kuuntelu</button>
+                </div>
+
+                <div class="target-note">
+                    <label for="targetNote">Tavoitenuotti:</label>
+                    <select id="targetNote" class="select">
+                        <option value="C3">C3</option>
+                        <option value="D3">D3</option>
+                        <option value="E3">E3</option>
+                        <option value="F3">F3</option>
+                        <option value="G3">G3</option>
+                        <option value="A3">A3</option>
+                        <option value="B3">B3</option>
+                        <option value="C4" selected>C4 (Middle C)</option>
+                        <option value="D4">D4</option>
+                        <option value="E4">E4</option>
+                        <option value="F4">F4</option>
+                        <option value="G4">G4</option>
+                        <option value="A4">A4 (440 Hz)</option>
+                        <option value="B4">B4</option>
+                        <option value="C5">C5</option>
+                    </select>
+                    <button id="playTarget" class="btn btn-small">▶ Soita</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="tuner-display">
+            <div class="frequency-display">
+                <div class="detected-note">
+                    <span class="label">Tunnistettu nuotti:</span>
+                    <span id="detectedNote" class="note">--</span>
+                </div>
+                <div class="frequency">
+                    <span class="label">Taajuus:</span>
+                    <span id="frequency" class="value">-- Hz</span>
+                </div>
+            </div>
+
+            <div class="tuner-meter">
+                <div class="meter-marks">
+                    <span class="mark">-50</span>
+                    <span class="mark">-25</span>
+                    <span class="mark center">0</span>
+                    <span class="mark">+25</span>
+                    <span class="mark">+50</span>
+                </div>
+                <div class="meter-bar">
+                    <div class="meter-center"></div>
+                    <div id="meterNeedle" class="meter-needle"></div>
+                </div>
+                <div class="cents-display">
+                    <span id="centsOff" class="cents">0</span>
+                    <span class="label">cents</span>
+                </div>
+            </div>
+
+            <div class="accuracy-indicator">
+                <div id="accuracyStatus" class="status">Odottaa ääntä...</div>
+            </div>
+        </div>
+
+        <div class="info">
+            <p><strong>Käyttöohje:</strong></p>
+            <ul>
+                <li>Käynnistä Drone saadaksesi taustanuotin laulamiseen</li>
+                <li>Valitse tavoitenuotti ja käynnistä mikrofoni</li>
+                <li>Laula valittua nuottia - mittari näyttää kuinka tarkasti osut</li>
+                <li>0 cents = täydellinen osuma, ±5 cents = erittäin hyvä, ±50 cents = puoli sävelaskelta viereinen</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Include Tone.js from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
+    <script src="singing-tutor.js"></script>
+</body>
+</html>
