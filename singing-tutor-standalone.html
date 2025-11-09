@@ -377,13 +377,18 @@ h2 {
                 </div>
 
                 <div class="slider-group">
-                    <label for="droneVolume">Äänenvoimakkuus: <span id="volumeValue">-12 dB</span></label>
+                    <label for="droneVolume">Drone äänenvoimakkuus: <span id="volumeValue">-12 dB</span></label>
                     <input type="range" id="droneVolume" min="-40" max="0" value="-12" class="slider">
                 </div>
 
                 <div class="reference-note-section">
                     <button id="toggleReference" class="btn btn-small btn-reference">🔔 Soita referenssinuotti</button>
                     <p class="hint">Puhdas jatkuva ääni johon on helppo laulaa mukaan</p>
+
+                    <div class="slider-group" style="margin-top: 15px;">
+                        <label for="referenceVolume">Referenssi äänenvoimakkuus: <span id="referenceVolumeValue">-6 dB</span></label>
+                        <input type="range" id="referenceVolume" min="-40" max="0" value="-6" class="slider">
+                    </div>
                 </div>
             </div>
 
@@ -458,6 +463,7 @@ const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 
 let drone = null;
 let droneVolume = null;
 let referenceNote = null;
+let referenceVolume = null;
 let isPlaying = false;
 let isReferencePlaying = false;
 
@@ -493,6 +499,9 @@ function initializeDrone() {
         }
     }).connect(reverb);
 
+    // Reference note with separate volume control
+    referenceVolume = new Tone.Volume(-6).toDestination();
+
     // Reference note synth - pure, clear continuous tone
     referenceNote = new Tone.Synth({
         oscillator: {
@@ -504,7 +513,7 @@ function initializeDrone() {
             sustain: 1, // Full sustain for continuous sound
             release: 1
         }
-    }).toDestination();
+    }).connect(referenceVolume);
 }
 
 async function startDrone() {
@@ -542,6 +551,13 @@ function updateDroneVolume(value) {
         droneVolume.volume.value = value;
     }
     document.getElementById('volumeValue').textContent = `${value} dB`;
+}
+
+function updateReferenceVolume(value) {
+    if (referenceVolume) {
+        referenceVolume.volume.value = value;
+    }
+    document.getElementById('referenceVolumeValue').textContent = `${value} dB`;
 }
 
 async function toggleReferenceNote() {
@@ -1013,6 +1029,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('stopDrone').addEventListener('click', stopDrone);
     document.getElementById('droneVolume').addEventListener('input', (e) => {
         updateDroneVolume(parseFloat(e.target.value));
+    });
+
+    // Reference volume control
+    document.getElementById('referenceVolume').addEventListener('input', (e) => {
+        updateReferenceVolume(parseFloat(e.target.value));
     });
 
     // Root note change - restart drone and reference if playing
