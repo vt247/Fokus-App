@@ -515,11 +515,12 @@ let microphone = null;
 let rafId = null;
 
 // Improved autocorrelation-based pitch detection (YIN-style)
+let lastValidFrequency = -1;
+let lastRMS = 0;
+
 function autoCorrelate(buffer, sampleRate) {
     const SIZE = buffer.length;
     const MAX_SAMPLES = Math.floor(SIZE / 2);
-    let best_offset = -1;
-    let best_correlation = 0;
     let rms = 0;
 
     // Calculate RMS (root mean square) to detect if there's enough signal
@@ -529,8 +530,27 @@ function autoCorrelate(buffer, sampleRate) {
     }
     rms = Math.sqrt(rms / SIZE);
 
-    // Not enough signal - increased threshold
-    if (rms < 0.005) return -1;
+    // Hysteresis to prevent flickering
+    const rmsThresholdLow = 0.001;  // Very sensitive - catches quiet sounds
+    const rmsThresholdHigh = 0.003; // Exit threshold
+
+    // Use hysteresis: harder to turn off than to stay on
+    if (lastRMS < rmsThresholdLow) {
+        // Was off, need to exceed low threshold to turn on
+        if (rms < rmsThresholdLow) {
+            lastRMS = rms;
+            return -1;
+        }
+    } else {
+        // Was on, only turn off if below high threshold
+        if (rms < rmsThresholdHigh) {
+            lastRMS = rms;
+            // Return last valid frequency for smooth fade-out
+            return lastValidFrequency;
+        }
+    }
+
+    lastRMS = rms;
 
     // Autocorrelation
     const correlations = new Array(MAX_SAMPLES);
@@ -556,8 +576,8 @@ function autoCorrelate(buffer, sampleRate) {
         }
     }
 
-    // Find the best offset with threshold
-    const threshold = 0.1;
+    // Find the best offset with threshold - more permissive
+    const threshold = 0.15; // Increased from 0.1 for more reliable detection
     let minOffset = -1;
 
     for (let offset = 2; offset < MAX_SAMPLES; offset++) {
@@ -584,8 +604,14 @@ function autoCorrelate(buffer, sampleRate) {
 
         // Filter out unrealistic frequencies
         if (fundamental >= 50 && fundamental <= 2000) {
+            lastValidFrequency = fundamental;
             return fundamental;
         }
+    }
+
+    // If no valid frequency found but we have signal, return last valid
+    if (lastValidFrequency !== -1) {
+        return lastValidFrequency;
     }
 
     return -1;
@@ -669,11 +695,14 @@ function updateTunerDisplay(frequency) {
         accuracyStatus.textContent = 'Odottaa ääntä...';
         accuracyStatus.className = 'status';
 
-        // Clear canvas but keep drawing center line
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawCenterLine(ctx, canvas);
-        pitchHistory = [];
-        smoothedCents = 0;
+        // Don't clear history immediately - let it fade
+        if (pitchHistory.length > 0) {
+            // Keep last position visible briefly
+            drawPitchVisualization(ctx, canvas, pitchHistory, smoothedCents, false);
+        } else {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawCenterLine(ctx, canvas);
+        }
         return;
     }
 
@@ -685,20 +714,26 @@ function updateTunerDisplay(frequency) {
 
     // Update text displays
     detectedNoteEl.textContent = note;
-    centsOffEl.textContent = `${cents > 0 ? '+' : ''}${cents} cents`;
 
-    // Add smoothed value to history
+    // Show cents even if wrong note - just show relative to detected note
+    if (isCorrectNote) {
+        centsOffEl.textContent = `${cents > 0 ? '+' : ''}${cents} cents`;
+    } else {
+        centsOffEl.textContent = `(${note})`;
+    }
+
+    // Add smoothed value to history - ALWAYS add when we have a frequency
     pitchHistory.push(smoothedCents);
     if (pitchHistory.length > maxHistoryLength) {
         pitchHistory.shift();
     }
 
-    // Draw canvas - always show the line
+    // Draw canvas - ALWAYS show the line when singing
     drawPitchVisualization(ctx, canvas, pitchHistory, smoothedCents, isCorrectNote);
 
     // Update accuracy status
     if (!isCorrectNote) {
-        accuracyStatus.textContent = `Väärä nuotti - laula ${getNoteNameOnly(targetNote)}`;
+        accuracyStatus.textContent = `Laula ${getNoteNameOnly(targetNote)} (nyt laulat ${note})`;
         accuracyStatus.className = 'status off';
     } else {
         const absCents = Math.abs(cents);
@@ -865,6 +900,12 @@ function stopMicrophone() {
         audioContext.close();
         audioContext = null;
     }
+
+    // Reset pitch detection state
+    lastValidFrequency = -1;
+    lastRMS = 0;
+    pitchHistory = [];
+    smoothedCents = 0;
 
     updateTunerDisplay(-1);
     document.getElementById('startMic').disabled = false;
